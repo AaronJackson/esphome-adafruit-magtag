@@ -1,0 +1,38 @@
+* ESPHome MagTag Example
+
+The Adafruit MagTag has a bunch of nice features which makes it a
+desirable board for ESPHome.
+
+- A 2.9 inch e-ink display
+- Light sensor
+- Speaker with built in amplifier (for simple tones)
+- 4 NeoPixel colour changing LEDs at the top
+- 4 buttons at the bottom
+- Accelerometer (not used in this example)
+
+This example includes some functionality for the first 5 items. While
+the display is not a Waveshare 2.9 inch display (it uses a "Good
+Displays" e-ink display), it does seem to be mostly compatible. I've
+not got greyscale working yet, so it's either on or off. It currently
+drawers some graphs and shows the time, plus some other little bits
+which are specific to my Home Assistant setup. I'd like to add a text
+notifier service at some point in the future. It would be nice to be
+able to use the built in speaker with RTTTL but I was unable to get
+this working. Instead, I provide the Adafruit example coin sound, plus
+a doorbell sound which I generated from an online sound file. These
+are exposed as Home Assistant services, so you can use it (for
+example) as a doorbell speaker.
+
+The light sensor state is reported every 30 seconds as a voltage
+level - I've not attempted to try and convert this to a more useful
+unit. The four buttons at the bottom show up in Home Assistant as
+actual buttons, so can be attached to automations.
+
+
+During development there is/was a bug in the Waveshare 2.9in drawing
+function which simply draws all back instead of the actual image
+data. I'm not sure if there was a reason for this but I submitted a
+pull request to output the buffer byte instead. It's not been merged
+(yet).
+
+https://github.com/esphome/esphome/pull/4222

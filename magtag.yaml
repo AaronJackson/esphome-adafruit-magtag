@@ -1,0 +1,234 @@
+esphome:
+  name: magtag
+  includes:
+    - audio.h
+    - coin.h
+    - doorbell.h
+
+esp32:
+  board: adafruit_magtag29_esp32s2
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "encryption key"
+  services:
+    - service: play_coin
+      then:
+        - lambda: |
+            pinMode(16, OUTPUT);
+            digitalWrite(16, HIGH);
+            play_tune(coin, sizeof(coin));
+            digitalWrite(16, LOW);
+    - service: play_doorbell
+      then:
+        - lambda: |
+            pinMode(16, OUTPUT);
+            digitalWrite(16, HIGH);
+            play_tune(doorbell, sizeof(doorbell));
+            digitalWrite(16, LOW);
+
+ota:
+  password: "ota password"
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  # Enable fallback hotspot (captive portal) in case wifi connection fails
+  ap:
+    ssid: "Magtag Fallback Hotspot"
+    password: "fallback password"
+
+captive_portal:
+
+spi:
+  clk_pin: GPIO36
+  mosi_pin: GPIO35
+  miso_pin: GPIO37
+
+font:
+  - file:
+      type: gfonts
+      family: Roboto
+    id: roboto
+    size: 12
+  - file:
+      type: gfonts
+      family: Roboto
+    id: roboto_big
+    size: 26
+
+output:
+  - platform: gpio
+    pin: GPIO21
+    id: enable_neopixel
+
+  - platform: gpio
+    pin: GPIO16
+    id: speaker_enable
+
+  - platform: gpio
+    pin: GPIO17
+    id: speaker_raw
+
+  - platform: gpio
+    pin: GPIO17
+    id: speaker
+
+light:
+  - platform: neopixelbus
+    type: GRB
+    variant: WS2811
+    pin: GPIO1
+    num_leds: 4
+    name: "NeoPixel"
+
+binary_sensor:
+  - platform: gpio
+    pin:
+      number: GPIO15
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: Button Left
+  - platform: gpio
+    pin:
+      number: GPIO11
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: Button Right
+  - platform: gpio
+    pin:
+      number: GPIO14
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: Button Up
+  - platform: gpio
+    pin:
+      number: GPIO12
+      inverted: true
+      mode:
+        input: true
+        pullup: true
+    name: Button Down
+
+
+sensor:
+  - platform: adc
+    pin: GPIO3
+    name: Light Sensor
+
+  - platform: homeassistant
+    name: "Aaron's Bedroom Temperature"
+    entity_id: sensor.env_aaron_bedroom_temperature
+    id: bedroom_temp
+
+  - platform: homeassistant
+    name: "Aaron's Bedroom Humidity"
+    entity_id: sensor.env_aaron_bedroom_humidity
+    id: bedroom_humidity
+
+  - platform: homeassistant
+    name: "Garden Temperature"
+    entity_id: sensor.env_garden_temperature
+    id: garden_temp
+
+  - platform: homeassistant
+    name: "Energy"
+    entity_id: sensor.total_power
+    id: total_power
+
+  - platform: homeassistant
+    entity_id: weather.home
+    attribute: pressure
+    id: weather_pressure
+
+text_sensor:
+  - platform: homeassistant
+    entity_id: weather.home
+    id: weather
+  - platform: homeassistant
+    entity_id: weather.home
+    attribute: pressure_unit
+    id: weather_pressure_unit
+
+time:
+  - platform: homeassistant
+    id: ha_time
+
+graph:
+  - id: graph_total_power
+    duration: 10min
+    border: False
+    width: 96
+    height: 68
+    min_value: 0
+    traces:
+      - sensor: total_power
+        line_thickness: 1
+  - id: graph_aarons_bedroom
+    duration: 12h
+    border: False
+    width: 256
+    height: 30
+    traces:
+      - sensor: bedroom_temp
+        line_thickness: 1
+      - sensor: bedroom_humidity
+        line_type: dashed
+        line_thickness: 1
+  - id: graph_pressure
+    duration: 6h
+    border: False
+    width: 96
+    height: 30
+    traces:
+      - sensor: weather_pressure
+        line_type: dashed
+        line_thickness: 1
+
+display:
+  - platform: waveshare_epaper
+    cs_pin: GPIO8
+    dc_pin: GPIO7
+    busy_pin: GPIO5
+    reset_pin: GPIO6
+    model: 2.90in-b
+    reset_duration: 200ms
+    # full_update_every: 30
+    update_interval: 20s
+    rotation: 270
+    lambda: |-
+      ESP_LOGI("display", "Updating display");
+
+      it.strftime(0, -1, id(roboto_big), "%H:%M", id(ha_time).now());
+      it.line(72, 0, 72, 30);
+      it.strftime(75, 0, id(roboto), "%A", id(ha_time).now());
+      it.strftime(75, 15, id(roboto), "%Y-%m-%d", id(ha_time).now());
+      it.line(160, 0, 160, 30);
+      it.graph(160, 0, id(graph_pressure));
+      it.printf(163, 0, id(roboto), "%s", id(weather).state.c_str());
+      it.printf(163, 15, id(roboto), "%.1f %s", id(weather_pressure).state, id(weather_pressure_unit).state.c_str());
+      it.line(0, 30, it.get_width(), 30);
+
+      it.line(it.get_width()-96, 30, it.get_width()-96, it.get_height()-30);
+      it.graph(it.get_width()-95, 31, id(graph_total_power));
+      it.line(0, it.get_height()-30, it.get_width(), it.get_height()-30);
+      it.printf(it.get_width()-93, it.get_height()-45, id(roboto), "%.0f Watts", id(total_power).state);
+
+      it.graph(0, it.get_height()-30, id(graph_aarons_bedroom));
+      it.printf(0, it.get_height()-30, id(roboto), "Aaron Bedroom");
+      it.printf(0, it.get_height()-15, id(roboto), "%.1f°c (%.0f%%)", id(bedroom_temp).state, id(bedroom_humidity).state);
+
+
